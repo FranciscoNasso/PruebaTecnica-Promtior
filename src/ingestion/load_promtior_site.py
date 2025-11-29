@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Any, Tuple
 
 from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader
-from langchain.schema import Document
+
+Document = Any
 
 
 # URLs de Promtior que querés indexar
@@ -44,29 +45,41 @@ def load_promtior_web_pages(urls: Optional[List[str]] = None) -> List[Document]:
 def load_promtior_presentation() -> List[Document]:
     """
     Carga la presentación de Promtior en PDF (si existe).
-    Ruta esperada: data/raw/promtior_presentation.pdf
+    Busca el archivo esperado y, si no existe, realiza un fallback
+    buscando cualquier .pdf en data/raw.
     """
     raw_dir = get_raw_data_dir()
-    pdf_path = raw_dir / "AI Engineer-Tecnical-Test.pdf"
+    expected_name = "AI Engineer-Tecnical-Test.pdf"
+    pdf_path = raw_dir / expected_name
 
-    if not pdf_path.exists():
-        # Si no existe, devolvemos lista vacía para no romper el flujo
+    if not raw_dir.exists():
         return []
 
-    loader = PyPDFLoader(str(pdf_path))
-    docs = loader.load()
-    return docs
+    # Si existe el archivo con el nombre exacto, usarlo
+    if pdf_path.exists():
+        loader = PyPDFLoader(str(pdf_path))
+        return loader.load()
+
+    # Fallback: buscar cualquier PDF en data/raw
+    pdf_files = list(raw_dir.glob("*.pdf"))
+    if pdf_files:
+        found = pdf_files[0]
+        print(f"[debug] PDF encontrado por fallback: {found}")
+        loader = PyPDFLoader(str(found))
+        return loader.load()
+
+    return []
 
 
 def get_promtior_documents(
     extra_urls: Optional[List[str]] = None,
     include_presentation: bool = True,
-) -> List[Document]:
+) -> Tuple[List[Document], bool]:
     """
     Función principal que usará el resto del código:
     - Carga las páginas web de Promtior
     - Opcionalmente, carga la presentación en PDF
-    - Devuelve todos los documentos juntos
+    - Devuelve una tupla: (lista de documentos, pdf_loaded_flag)
     """
     urls = PROMTIOR_URLS.copy()
     if extra_urls:
@@ -84,12 +97,14 @@ def get_promtior_documents(
     for d in all_docs:
         d.metadata.setdefault("source_type", "web_or_pdf")
 
-    return all_docs
+    pdf_loaded = bool(pdf_docs)
+    return all_docs, pdf_loaded
 
 
 if __name__ == "__main__":
-    docs = get_promtior_documents()
+    docs, pdf_loaded = get_promtior_documents()
     print(f"Documentos cargados: {len(docs)}")
+    print(f"PDF cargado: {pdf_loaded}")
     if docs:
         print("Ejemplo de contenido:\n")
         print(docs[0].page_content[:1000])

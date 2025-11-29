@@ -3,10 +3,15 @@ langchain>=0.2.7
 langchain-community>=0.2.6
 langchain-openai>=0.1.8
 langserve>=0.2.3
+langchain-chroma
+
+# -- (Opcional) En caso de fallar OpenAI ---
+sentence-transformers
 
 # --- Web server (FastAPI + Uvicorn) ---
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
+sse_starlette
 
 # --- Vector store ---
 chromadb>=0.4.24
