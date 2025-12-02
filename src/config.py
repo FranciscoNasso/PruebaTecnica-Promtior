@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Resolver ruta del proyecto de forma robusta
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # src/ -> parent = proyecto raíz
-ENV_PATH = PROJECT_ROOT / "environments" / "local.env"
+ENV_PATH = PROJECT_ROOT / "environments" / ".env"
 
 # Carga el .env (si existe)
 if ENV_PATH.exists():
