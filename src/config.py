@@ -24,8 +24,17 @@ else:
 # Ensure USER_AGENT is set to silence some client warnings (can be overridden via env)
 os.environ.setdefault("USER_AGENT", "promtior-rag/1.0")
 
+# sanitize OPENAI_API_KEY to remove trailing newlines/quotes/spaces that break HTTP headers
+_raw_openai_key = os.getenv("OPENAI_API_KEY")
+if _raw_openai_key:
+    _clean_key = _raw_openai_key.strip().strip('"').strip("'").replace("\n", "").replace("\r", "")
+    # put back into env so other libraries see the cleaned value
+    os.environ["OPENAI_API_KEY"] = _clean_key
+else:
+    _clean_key = None
+
 class Settings(BaseModel):
-    openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
+    openai_api_key: str | None = _clean_key
     model_name: str = os.getenv("MODEL_NAME", "gpt-4o-mini")
     vectorstore_dir: str = os.getenv("VECTORSTORE_DIR", "./data/vectorstore")
     frontend_dir: str = os.getenv("FRONTEND_DIR", "./frontend")
