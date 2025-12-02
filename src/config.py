@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 from pathlib import Path
+import logging
 
 # Resolver ruta del proyecto de forma robusta
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # src/ -> parent = proyecto raíz
@@ -17,7 +18,11 @@ if env_file_override:
 elif ENV_PATH.exists():
     load_dotenv(dotenv_path=str(ENV_PATH))
 else:
-    raise FileNotFoundError(f"El archivo de entorno no se encontró en: {ENV_PATH}")
+    # No local env found — OK for hosted envs (Railway). Do not raise.
+    logging.getLogger(__name__).info("No local env file found; using environment variables from host.")
+
+# Ensure USER_AGENT is set to silence some client warnings (can be overridden via env)
+os.environ.setdefault("USER_AGENT", "promtior-rag/1.0")
 
 class Settings(BaseModel):
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
