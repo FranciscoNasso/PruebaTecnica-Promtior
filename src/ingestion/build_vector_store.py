@@ -7,8 +7,6 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from sentence_transformers import SentenceTransformer
-
 from src.ingestion.load_promtior_site import get_promtior_documents
 from src.config import settings
 
@@ -50,34 +48,19 @@ def build_vector_store() -> None:
     split_docs = text_splitter.split_documents(docs)
     print(f"Total de chunks después de split: {len(split_docs)}")
 
-    # Intentar OpenAI embeddings, si falla usar local
-    embeddings = None
-    use_local = False
-    if settings.openai_api_key:
-        try:
-            embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=settings.openai_api_key)
-            print("Usando OpenAIEmbeddings.")
-        except Exception as e:
-            print("OpenAIEmbeddings falló:", e)
-            use_local = True
-    else:
-        use_local = True
+    # OpenAI embeddings required (no sentence-transformers fallback)
+    if not settings.openai_api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY no configurada. Este script requiere embeddings de OpenAI. "
+            "Configura la variable de entorno OPENAI_API_KEY o modifica el loader para usar embeddings locales."
+        )
 
-    # Local embeddings fallback
-    class LocalEmbeddings:
-        def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-            self.model = SentenceTransformer(model_name)
-        def embed_documents(self, texts):
-            return self.model.encode(texts, show_progress_bar=False).tolist()
-        def embed_query(self, text):
-            return self.model.encode([text])[0].tolist()
-
-    if use_local:
-        try:
-            embeddings = LocalEmbeddings()
-            print("Usando embeddings locales (sentence-transformers).")
-        except Exception as e:
-            raise RuntimeError("No se pudo inicializar embeddings locales. Instalá sentence-transformers o arreglá la clave OpenAI.") from e
+    try:
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=settings.openai_api_key)
+        print("Usando OpenAIEmbeddings.")
+    except Exception as e:
+        print("OpenAIEmbeddings falló al inicializar:", e)
+        raise RuntimeError("No se pudo inicializar OpenAIEmbeddings. Revisá OPENAI_API_KEY y conectividad.") from e
 
     vectorstore_dir = get_vectorstore_dir()
     vectorstore_dir.mkdir(parents=True, exist_ok=True)
@@ -102,21 +85,13 @@ def build_vector_store() -> None:
                 break
             except Exception as e:
                 msg = str(e).lower()
-                # Detectar cuota/rate-limit y cambiar a embeddings locales
+                # Si es un error de cuota/rate-limit -> fallar con mensaje instructivo
                 if "insufficient_quota" in msg or "quota" in msg or "429" in msg or "rate limit" in msg:
-                    print("Error de cuota detectado. Cambiando a embeddings locales (sentence-transformers) y reintentando el batch.")
-                    try:
-                        from sentence_transformers import SentenceTransformer
-                    except Exception:
-                        raise RuntimeError("Instalá sentence-transformers: pip install sentence-transformers") from e
-                    local_emb = LocalEmbeddings()
-                    try:
-                        vectorstore._embedding_function = local_emb
-                    except Exception:
-                        # fallback: reconstruir Chroma usando la función local
-                        vectorstore = Chroma(persist_directory=str(vectorstore_dir), embedding_function=local_emb)
-                    # no incrementar retries, reintentar inmediatamente
-                    continue
+                    raise RuntimeError(
+                        "Error de cuota/rate-limit de OpenAI al añadir embeddings. "
+                        "Revisá la clave OPENAI_API_KEY, billing y límites de cuota."
+                    ) from e
+
                 retries += 1
                 if retries > 5:
                     print("Máximos reintentos alcanzados al añadir batch:", e)

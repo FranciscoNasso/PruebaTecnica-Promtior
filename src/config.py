@@ -5,10 +5,16 @@ from pathlib import Path
 
 # Resolver ruta del proyecto de forma robusta
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # src/ -> parent = proyecto raíz
-ENV_PATH = PROJECT_ROOT / "environments" / ".env"
+ENV_PATH = PROJECT_ROOT / "environments" / "local.env"
 
-# Carga el .env (si existe)
-if ENV_PATH.exists():
+# Cargar .env sólo si existe, o usar ENV_FILE como override.
+# No lanzar excepción si no existe: en Railway las vars vienen del entorno.
+env_file_override = os.getenv("ENV_FILE")
+if env_file_override:
+    env_path = Path(env_file_override)
+    if env_path.exists():
+        load_dotenv(dotenv_path=str(env_path))
+elif ENV_PATH.exists():
     load_dotenv(dotenv_path=str(ENV_PATH))
 else:
     raise FileNotFoundError(f"El archivo de entorno no se encontró en: {ENV_PATH}")
