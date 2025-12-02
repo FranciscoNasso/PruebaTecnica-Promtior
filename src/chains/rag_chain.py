@@ -1,5 +1,3 @@
-# src/chains/rag_chain.py
-
 from __future__ import annotations
 
 from typing import List, Any
@@ -9,7 +7,6 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
 from langchain_community.document_loaders import WebBaseLoader, PyPDFLoader
 import openai
-# from openai import error as openai_error
 
 
 from src.config import settings
